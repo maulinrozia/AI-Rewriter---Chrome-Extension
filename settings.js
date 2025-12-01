@@ -1,6 +1,7 @@
 document.addEventListener('DOMContentLoaded', () => {
     const apiKeyInput = document.getElementById('api-key');
     const modelSelect = document.getElementById('model-select');
+    const allowedDomainsTextarea = document.getElementById('allowed-domains'); // Get the new textarea
     const saveButton = document.getElementById('save-button');
     const statusDiv = document.getElementById('status');
 
@@ -18,7 +19,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // 1. Load saved settings on startup
-    chrome.storage.local.get(['apiKey', 'modelName'], (items) => {
+    chrome.storage.local.get(['apiKey', 'modelName', 'allowedDomains'], (items) => {
         if (items.apiKey) {
             apiKeyInput.value = items.apiKey;
         }
@@ -28,6 +29,10 @@ document.addEventListener('DOMContentLoaded', () => {
              // Default to GPT-3.5 Turbo if no model is saved
              modelSelect.value = "openai/gpt-3.5-turbo";
         }
+        // Load the saved domains
+        if (items.allowedDomains) {
+            allowedDomainsTextarea.value = items.allowedDomains;
+        }
         showStatus('Settings loaded.', 'success');
     });
 
@@ -35,6 +40,7 @@ document.addEventListener('DOMContentLoaded', () => {
     saveButton.addEventListener('click', () => {
         const apiKey = apiKeyInput.value.trim();
         const modelName = modelSelect.value;
+        const allowedDomains = allowedDomainsTextarea.value.trim(); // Get the domains content
 
         if (!apiKey) {
              showStatus('Please enter an OpenRouter API Key.', 'error');
@@ -48,7 +54,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
         chrome.storage.local.set({
             apiKey: apiKey,
-            modelName: modelName // Now saving the selected model name
+            modelName: modelName,
+            allowedDomains: allowedDomains // Save the domains content
         }, () => {
             showStatus(`Settings saved successfully! Model: ${modelName}`, 'success');
         });
