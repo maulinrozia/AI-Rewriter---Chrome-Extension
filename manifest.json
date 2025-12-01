@@ -1,0 +1,24 @@
+{
+  "manifest_version": 3,
+  "name": "The Rewrite Engine",
+  "version": "1.0",
+  "description": "Select text and rewrite it with an improved tone or format using OpenRouter models.",
+  "permissions": [
+    "storage",
+    "activeTab"
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ],
+  "options_page": "settings.html",
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"],
+      "css": ["content.css"]
+    }
+  ]
+}
