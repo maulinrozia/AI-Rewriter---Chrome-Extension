@@ -1,4 +1,4 @@
-The OpenRouter Rewrite Engine
+**The OpenRouter Rewrite Engine**
 
 🚀 Overview
 The OpenRouter Rewrite Engine is a powerful, lightweight Chrome extension designed to instantly elevate the professionalism of your writing across any webpage. By leveraging the flexibility and model access provided by the OpenRouter API, this tool allows users to select text, generate three distinct professional rewrite options, and instantly replace the original content with a single click.
