@@ -1,15 +1,21 @@
+let button;
+let panel;
+let selectedText = '';
+let currentSelectionRange = null; 
+let isUiInitialized = false;
+
 // --- Floating Button and Modal UI Setup ---
 
 // Create and inject the button and modal panel into the page body
 function createFloatingUI() {
     // 1. Rewrite Button
-    let button = document.createElement('button');
+    button = document.createElement('button'); // Assign to global
     button.id = 'rewrite-button';
     button.textContent = '✨ Rewrite';
     document.body.appendChild(button);
 
     // 2. Rewrite Panel (Modal)
-    let panel = document.createElement('div');
+    panel = document.createElement('div'); // Assign to global
     panel.id = 'rewrite-panel';
     panel.innerHTML = `
         <h3>Rewrite Suggestions</h3>
@@ -23,13 +29,14 @@ function createFloatingUI() {
         <button id="close-panel">Close</button>
     `;
     document.body.appendChild(panel);
+    
+    // Attach close listener once
+    document.getElementById('close-panel').addEventListener('click', () => {
+        panel.style.display = 'none';
+    });
 
-    return { button, panel };
+    isUiInitialized = true;
 }
-
-const { button, panel } = createFloatingUI();
-let selectedText = '';
-let currentSelectionRange = null; 
 
 // --- Core Selection Logic ---
 
@@ -37,9 +44,10 @@ let currentSelectionRange = null;
 function getSelectionData() {
     const selection = window.getSelection();
     if (selection.rangeCount > 0) {
-        const range = selection.getRangeAt(0);
+        // CRITICAL FIX: Clone the range to preserve its state after selection clears
+        const range = selection.getRangeAt(0).cloneRange(); 
         return {
-            range: range.cloneRange(), // CRITICAL: Clone the range to preserve its state
+            range: range,
             text: selection.toString().trim()
         };
     }
@@ -67,28 +75,6 @@ function showButton(clientX, clientY) {
 function hideButton() {
     button.classList.remove('visible');
 }
-
-// Store the selection and show the button on mouseup
-document.addEventListener('mouseup', (event) => {
-    const selectionData = getSelectionData();
-    const clientX = event.clientX;
-    const clientY = event.clientY;
-    
-    // Check if the click was on the button itself or inside the modal
-    if (event.target === button || panel.contains(event.target)) {
-        return;
-    }
-
-    if (selectionData && selectionData.text.length > 0) {
-        selectedText = selectionData.text;
-        currentSelectionRange = selectionData.range; // Store the cloned range
-        showButton(clientX, clientY);
-    } else {
-        selectedText = '';
-        currentSelectionRange = null;
-        hideButton();
-    }
-});
 
 
 // --- Modal & Replacement Logic ---
@@ -140,7 +126,7 @@ function replaceOriginalText(newText) {
             // 2. Insert the new text node where the old text was
             currentSelectionRange.insertNode(newNode);
 
-            // 3. Clear selection and close panel (We explicitly clear here for cleanliness)
+            // 3. Clear selection and close panel 
             const selection = window.getSelection();
             selection.removeAllRanges();
             selection.addRange(currentSelectionRange); // Optionally re-select the new text
@@ -153,6 +139,7 @@ function replaceOriginalText(newText) {
 
         } catch (e) {
             console.error("DOM replacement failed:", e);
+            // This alert helps debug why replacement failed on specific sites
             alert('Error replacing text. The page structure might prevent editing or the selection was invalid.');
         }
     } else {
@@ -163,48 +150,92 @@ function replaceOriginalText(newText) {
 
 // --- Event Listeners and Background Communication ---
 
-// 1. Click the floating button to open the panel and start rewriting
-button.addEventListener('click', () => {
-    if (!selectedText) {
-        alert("Please select text before using the 'Rewrite Text' button.");
+function setupListeners() {
+    // Store the selection and show the button on mouseup
+    document.addEventListener('mouseup', (event) => {
+        const selectionData = getSelectionData();
+        const clientX = event.clientX;
+        const clientY = event.clientY;
+        
+        // Check if the click was on the button itself or inside the modal
+        if (event.target === button || panel.contains(event.target)) {
+            return;
+        }
+
+        if (selectionData && selectionData.text.length > 0) {
+            selectedText = selectionData.text;
+            currentSelectionRange = selectionData.range; // Store the cloned range
+            showButton(clientX, clientY);
+        } else {
+            selectedText = '';
+            currentSelectionRange = null;
+            hideButton();
+        }
+    });
+
+    // 1. Click the floating button to open the panel and start rewriting
+    button.addEventListener('click', () => {
+        if (!selectedText) {
+            alert("Please select text before using the 'Rewrite Text' button.");
+            return;
+        }
+
+        // Show loading state and modal
+        showLoading();
+        hideButton(); // Hide floating button once panel is open
+
+        // Send the rewrite request to the background service worker (tone is hardcoded 'professional')
+        chrome.runtime.sendMessage({
+            action: 'requestRewrite',
+            text: selectedText,
+            tone: 'professional' // Hardcoded tone
+        }, (response) => {
+            if (response.success) {
+                // Parse the JSON response
+                try {
+                    // Ensure we strip common markdown code blocks if the model wrapped the JSON
+                    const cleanJson = response.rewrittenText.replace(/^```json\s*|```\s*$/g, '').trim();
+
+                    const options = JSON.parse(cleanJson);
+                    displayOptions(options);
+                } catch (e) {
+                    // Handle non-JSON or malformed response
+                    console.error("Failed to parse JSON response:", response.rewrittenText, e);
+                    // Display error message to user
+                    const errorMessage = `Error: AI returned invalid format. Please check the model. Full response: ${response.rewrittenText.substring(0, 100)}...`;
+                    document.getElementById('rewrite-loader').style.display = 'none';
+                    document.getElementById('options-container').innerHTML = `<p style="color: red;">${errorMessage}</p>`;
+                }
+            } else {
+                // Handle API error
+                document.getElementById('rewrite-loader').style.display = 'none';
+                document.getElementById('options-container').innerHTML = `<p style="color: red;">API Error: ${response.error || 'Failed to get a response.'}</p>`;
+            }
+        });
+    });
+}
+
+
+// --- Initialization and Domain Filtering ---
+
+(async function initExtension() {
+    const storage = await chrome.storage.local.get(['allowedDomains']);
+    const allowedDomains = storage.allowedDomains || '';
+    const currentDomain = window.location.hostname;
+    
+    // Check if the current domain is in the allowed list
+    const isAllowed = allowedDomains.split('\n')
+        .map(d => d.trim())
+        .filter(d => d.length > 0)
+        .some(d => currentDomain.includes(d));
+
+    // If there are domains listed, and the current one is NOT allowed, exit without creating UI/listeners
+    if (allowedDomains.trim().length > 0 && !isAllowed) {
+        console.log("Rewrite Engine: Not enabled for this domain.");
         return;
     }
 
-    // Show loading state and modal
-    showLoading();
-    hideButton(); // Hide floating button once panel is open
-
-    // Send the rewrite request to the background service worker (tone is hardcoded 'professional')
-    chrome.runtime.sendMessage({
-        action: 'requestRewrite',
-        text: selectedText,
-        tone: 'professional' // Hardcoded tone
-    }, (response) => {
-        if (response.success) {
-            // Parse the JSON response
-            try {
-                // Ensure we strip common markdown code blocks if the model wrapped the JSON
-                const cleanJson = response.rewrittenText.replace(/^```json\s*|```\s*$/g, '').trim();
-
-                const options = JSON.parse(cleanJson);
-                displayOptions(options);
-            } catch (e) {
-                // Handle non-JSON or malformed response
-                console.error("Failed to parse JSON response:", response.rewrittenText, e);
-                // Display error message to user
-                const errorMessage = `Error: AI returned invalid format. Please check the model. Full response: ${response.rewrittenText.substring(0, 100)}...`;
-                document.getElementById('rewrite-loader').style.display = 'none';
-                document.getElementById('options-container').innerHTML = `<p style="color: red;">${errorMessage}</p>`;
-            }
-        } else {
-            // Handle API error
-            document.getElementById('rewrite-loader').style.display = 'none';
-            document.getElementById('options-container').innerHTML = `<p style="color: red;">API Error: ${response.error || 'Failed to get a response.'}</p>`;
-        }
-    });
-});
-
-// 2. Close the panel
-document.getElementById('close-panel').addEventListener('click', () => {
-    panel.style.display = 'none';
-});
+    // If allowed (or no domains are listed), create UI and set up listeners
+    createFloatingUI();
+    setupListeners();
+})();
