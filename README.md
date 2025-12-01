@@ -26,6 +26,7 @@ Configure API Key: Open the extension's Options page (via the extension icon) an
 
 
 ⚙️ Generic Guide for Implementing External AI APIs
+
 Generic Guide for Implementing External AI APIs in background.jsThis guide outlines the general structure for integrating a third-party Language Model API directly into your Chrome Extension's background.js Service Worker.Note: Your current extension implementation uses the OpenRouter endpoint (https://openrouter.ai/api/v1/chat/completions) for all model calls. OpenRouter is generally preferred as it handles routing, authentication, and payload conversion for multiple models (including GPT, Claude, and Gemini) under a single, consistent API key and endpoint.Template for a Direct, Single-Provider API FunctionIf you ever need to bypass OpenRouter and integrate a new, proprietary AI service, you must define the following asynchronous function:/**
  * Calls a direct, external API endpoint to process and rewrite text.
  * * @param {string} text The original text to rewrite.
