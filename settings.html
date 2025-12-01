@@ -29,13 +29,17 @@
             margin-bottom: 5px;
             font-weight: bold;
         }
-        input[type="text"], select {
+        input[type="text"], select, textarea {
             width: 100%;
             padding: 10px;
             border: 1px solid #ccc;
             border-radius: 4px;
             box-sizing: border-box;
             font-size: 16px;
+            resize: vertical;
+        }
+        textarea {
+            min-height: 100px;
         }
         button {
             padding: 10px 20px;
@@ -73,6 +77,12 @@
     <h1>Rewrite Engine Settings (OpenRouter)</h1>
 
     <div class="form-group">
+        <label for="api-key">OpenRouter API Key:</label>
+        <input type="text" id="api-key" placeholder="Enter your OpenRouter API Key here">
+        <small style="display: block; margin-top: 5px; color: #666;">This key is stored securely on your local device only.</small>
+    </div>
+
+    <div class="form-group">
         <label for="model-select">OpenRouter Model:</label>
         <select id="model-select">
             <option value="openai/gpt-3.5-turbo">GPT-3.5 Turbo (Fast/Cheap)</option>
@@ -83,11 +93,11 @@
             <option value="google/gemini-2.5-flash">Gemini 2.5 Flash</option>
         </select>
     </div>
-
+    
     <div class="form-group">
-        <label for="api-key">OpenRouter API Key:</label>
-        <input type="text" id="api-key" placeholder="Enter your OpenRouter API Key here">
-        <small style="display: block; margin-top: 5px; color: #666;">This key is stored securely on your local device only.</small>
+        <label for="allowed-domains">URL Filter (Allowed Domains):</label>
+        <textarea id="allowed-domains" placeholder="Enter domains line by line (e.g., google.com, mail.google.com, docs.google.com). Leave blank to enable everywhere."></textarea>
+        <small style="display: block; margin-top: 5px; color: #666;">The extension will only be active on these domains.</small>
     </div>
 
     <button id="save-button">Save Settings</button>
